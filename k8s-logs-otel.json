@@ -1,0 +1,189 @@
+{
+  "__inputs": [
+    {
+      "name": "DS_LOKI",
+      "label": "Datasource Loki",
+      "description": "Sélectionner la datasource Loki de l'organisation",
+      "type": "datasource",
+      "pluginId": "loki",
+      "pluginName": "Loki"
+    }
+  ],
+  "__requires": [
+    {"type": "datasource", "id": "loki", "name": "Loki", "version": "1.0.0"},
+    {"type": "grafana", "id": "grafana", "name": "Grafana", "version": "10.0.0"}
+  ],
+  "__elements": {},
+  "title": "K8S Logs (OTel)",
+  "uid": "k8s-logs-otel",
+  "description": "K8S pod logs via Otel + Loki",
+  "tags": ["logs"],
+  "refresh": "30s",
+  "schemaVersion": 38,
+  "time": {"from": "now-1h", "to": "now"},
+  "timepicker": {},
+  "timezone": "browser",
+  "annotations": {"list": []},
+  "links": [],
+  "templating": {
+    "list": [
+      {
+        "name": "DS_LOKI",
+        "type": "datasource",
+        "query": "loki",
+        "label": "Datasource Loki",
+        "hide": 0,
+        "refresh": 1,
+        "multi": false,
+        "includeAll": false,
+        "current": {},
+        "options": []
+      },
+      {
+        "name": "namespace",
+        "type": "query",
+        "datasource": {"type": "loki", "uid": "${DS_LOKI}"},
+        "definition": "label_values(k8s_namespace_name)",
+        "query": "label_values(k8s_namespace_name)",
+        "label": "Namespace",
+        "hide": 0,
+        "refresh": 2,
+        "sort": 1,
+        "multi": true,
+        "includeAll": true,
+        "current": {},
+        "options": []
+      },
+      {
+        "name": "pod",
+        "type": "query",
+        "datasource": {"type": "loki", "uid": "${DS_LOKI}"},
+        "definition": "label_values({k8s_namespace_name=~\"$namespace\"}, k8s_pod_name)",
+        "query": "label_values({k8s_namespace_name=~\"$namespace\"}, k8s_pod_name)",
+        "label": "Pod",
+        "hide": 0,
+        "refresh": 2,
+        "sort": 1,
+        "multi": true,
+        "includeAll": true,
+        "current": {},
+        "options": []
+      },
+      {
+        "name": "container",
+        "type": "query",
+        "datasource": {"type": "loki", "uid": "${DS_LOKI}"},
+        "definition": "label_values({k8s_namespace_name=~\"$namespace\", k8s_pod_name=~\"$pod\"}, k8s_container_name)",
+        "query": "label_values({k8s_namespace_name=~\"$namespace\", k8s_pod_name=~\"$pod\"}, k8s_container_name)",
+        "label": "Container",
+        "hide": 0,
+        "refresh": 2,
+        "sort": 1,
+        "multi": true,
+        "includeAll": true,
+        "current": {},
+        "options": []
+      },
+      {
+        "name": "level",
+        "type": "custom",
+        "label": "Level",
+        "hide": 0,
+        "multi": true,
+        "includeAll": true,
+        "allValue": ".*",
+        "query": "error,debug,info,warn,warning,fatal,critical",
+        "current": {},
+        "options": []
+      },
+      {
+        "name": "search",
+        "type": "textbox",
+        "label": "Search",
+        "hide": 0,
+        "current": {"selected": true, "text": "", "value": ""},
+        "options": [{"selected": true, "text": "", "value": ""}],
+        "query": ""
+      }
+    ]
+  },
+  "panels": [
+    {
+      "id": 1,
+      "type": "timeseries",
+      "title": "Log rate by namespace",
+      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 0},
+      "datasource": {"type": "loki", "uid": "${DS_LOKI}"},
+      "fieldConfig": {
+        "defaults": {
+          "color": {"mode": "palette-classic"},
+          "custom": {"lineWidth": 1, "fillOpacity": 10}
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {"displayMode": "list", "placement": "bottom"},
+        "tooltip": {"mode": "multi"}
+      },
+      "targets": [
+        {
+          "datasource": {"type": "loki", "uid": "${DS_LOKI}"},
+          "expr": "sum by(k8s_namespace_name) (rate({k8s_namespace_name=~\"$namespace\"} |~ \"(?i)$level\" [5m]))",
+          "legendFormat": "{{k8s_namespace_name}}",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "type": "timeseries",
+      "title": "Error rate by namespace",
+      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 0},
+      "datasource": {"type": "loki", "uid": "${DS_LOKI}"},
+      "fieldConfig": {
+        "defaults": {
+          "color": {"mode": "fixed", "fixedColor": "red"},
+          "custom": {"lineWidth": 1, "fillOpacity": 10}
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {"displayMode": "list", "placement": "bottom"},
+        "tooltip": {"mode": "multi"}
+      },
+      "targets": [
+        {
+          "datasource": {"type": "loki", "uid": "${DS_LOKI}"},
+          "expr": "sum by(k8s_namespace_name) (rate({k8s_namespace_name=~\"$namespace\"} |~ \"(?i)(error|fatal|panic)\" [5m]))",
+          "legendFormat": "{{k8s_namespace_name}}",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "type": "logs",
+      "title": "Logs",
+      "gridPos": {"h": 22, "w": 24, "x": 0, "y": 8},
+      "datasource": {"type": "loki", "uid": "${DS_LOKI}"},
+      "options": {
+        "dedupStrategy": "none",
+        "enableLogDetails": true,
+        "prettifyLogMessage": false,
+        "showCommonLabels": false,
+        "showLabels": true,
+        "showTime": true,
+        "sortOrder": "Descending",
+        "wrapLogMessage": true
+      },
+      "targets": [
+        {
+          "datasource": {"type": "loki", "uid": "${DS_LOKI}"},
+          "expr": "{k8s_namespace_name=~\"$namespace\", k8s_pod_name=~\"$pod\", k8s_container_name=~\"$container\"} |~ \"(?i)$level\" |~ \"(?i)$search\"",
+          "refId": "A"
+        }
+      ]
+    }
+  ],
+  "version": 2
+}
